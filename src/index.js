@@ -66,12 +66,24 @@ function makeVertexIndexBuffer(attrib)
         }
     }
 
+    let mc = 0;
+    const mchange = new Uint32Array(attrib.materialId.length * 2);
+    for (let i = 0; i < attrib.materialId.length; ++i) {
+        if (i === 0 || mchange[mc - 1] !== attrib.materialId[i]) {
+            mchange[mc + 0] = i;
+            mchange[mc + 1] = attrib.materialId[i];
+            mc += 2;
+        }
+    }
+
     const bv32 = toBuffer(v32);
     const bi32 = toBuffer(i32);
+    const bmchange = toBuffer(mchange);
 
     return {
         v32: bv32.slice(0, vc * Float32Array.BYTES_PER_ELEMENT),
-        i32: bi32.slice(0, ic * Uint32Array.BYTES_PER_ELEMENT)
+        i32: bi32.slice(0, ic * Uint32Array.BYTES_PER_ELEMENT),
+        mchange: bmchange.slice(0, mc * Uint32Array.BYTES_PER_ELEMENT)
     };
 }
 
@@ -199,6 +211,9 @@ function serve()
                         break;
                     case "indices":
                         writeBlob(d.vi.i32);
+                        break;
+                    case "mchange":
+                        writeBlob(d.vi.mchange);
                         break;
                     case "resource":
                         serveResource(p.slice(2));
