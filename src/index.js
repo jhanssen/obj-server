@@ -140,40 +140,54 @@ function serve()
             });
             res.end(blobdata);
         };
-        const serveResource = p => {
-            const fp = p.join("/");
-            fs.realpath(fp, (err, rp) => {
+        const serveFile = f => {
+            fs.readFile(f, (err, data) => {
+                if (err || !data) {
+                    res.writeHead(500);
+                    res.end();
+                } else {
+                    res.writeHead(200, {
+                        "Content-Type": mime.lookup(path.extname(f)),
+                        "Content-Length": data.length
+                    });
+                    res.end(data);
+                }
+            });
+        };
+        const maybeServeFile = (f, base) => {
+            fs.realpath(f, (err, rp) => {
                 if (err || !rp || rp.length === 0) {
                     res.writeHead(500);
                     res.end();
                 } else {
-                    // verify that rp contains realDir
-                    if (rp.indexOf(realDir) !== 0) {
+                    // verify that rp contains base
+                    if (rp.indexOf(base) !== 0) {
                         res.writeHead(404);
                         res.end();
                     } else {
-                        // read the file
-                        fs.readFile(rp, (err, data) => {
-                            if (err || !data) {
-                                res.writeHead(500);
-                                res.end();
-                            } else {
-                                res.writeHead(200, {
-                                    "Content-Type": mime.lookup(path.extname(rp)),
-                                    "Content-Length": data.length
-                                });
-                                res.end(data);
-                            }
-                        });
+                        // serve the file
+                        serveFile(rp);
                     }
                 }
             });
         };
+        const maybeServeResource = p => {
+            const fp = p.join("/");
+            maybeServeFile(fp, realDir);
+        };
 
         const p = req.url.split("/").filter(a => a.length > 0);
         if (p.length === 0 || p[0].length === 0) {
+            serveFile(path.join(__dirname, "gibbon.js"));
+        } else if (p[0] === "all") {
             writeJson(JSON.stringify(Array.from(data.keys())));
         } else {
+            const ext = path.extname(p[0]);
+            if (ext === ".js") {
+                maybeServeFile(path.join(__dirname, p[0]), __dirname);
+                return;
+            }
+
             const d = data.get(p[0]);
             if (!d) {
                 res.writeHead(404);
@@ -216,7 +230,7 @@ function serve()
                         writeBlob(d.vi.mchange);
                         break;
                     case "resource":
-                        serveResource(p.slice(2));
+                        maybeServeResource(p.slice(2));
                         break;
                     default:
                         res.writeHead(404);
