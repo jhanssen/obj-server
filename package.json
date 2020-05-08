@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "@jhanssen/options": "^1.0.28",
+    "gl-matrix": "^3.3.0",
     "glob": "^7.1.6",
     "mime-types": "^2.1.27",
     "obj-loader": "github:jhanssen/obj-loader",

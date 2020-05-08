@@ -26,15 +26,34 @@ function makeFloat32Array(arr)
     return toBuffer(f32);
 }
 
-function makeVertexIndexBuffer(attrib)
+function makeVertexIndexBuffer(attrib, shapes)
 {
     const m = new Map();
     let vc = 0;
     let ic = 0;
 
+    let curshape = 0;
+
+    const vbounds = [Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE, -Number.MAX_VALUE, -Number.MAX_VALUE, -Number.MAX_VALUE];
+
     const v32 = new Float32Array(attrib.faces.length * 5); // * 5 is worst case scenario, (x, y, z, t0, t1)
-    const i32 = new Uint32Array(attrib.faces.length);
-    for (const face of attrib.faces) {
+    let i32 = new Uint32Array(attrib.faces.length);
+
+    const i32s = [];
+
+    for (let fc = 0; fc < attrib.faces.length; ++fc) {
+        const face = attrib.faces[fc];
+
+        while (fc >= shapes[curshape]._offset + shapes[curshape]._length) {
+            const bi32 = toBuffer(i32);
+            i32s.push(bi32.slice(0, ic * Uint32Array.BYTES_PER_ELEMENT));
+
+            i32 = new Uint32Array(attrib.faces.length * 2);
+            ic = 0;
+
+            ++curshape;
+        }
+
         const v = [
             attrib.vertices[3 * face[0] + 0],
             attrib.vertices[3 * face[0] + 1],
@@ -44,11 +63,11 @@ function makeVertexIndexBuffer(attrib)
             attrib.texcoords[2 * face[2] + 0],
             1.0 - attrib.texcoords[2 * face[2] + 1]
         ];
-        const k = `${v[0]}:${v[1]}:${v[2]}:${t[0]}:${t[1]}`;
+        const k = `${face[0]}:${face[2]}`;
         const f = m.get(k);
         if (f === undefined) {
             // insert
-            m.set(k, vc);
+            m.set(k, vc / 5);
 
             v32[vc + 0] = v[0];
             v32[vc + 1] = v[1];
@@ -56,7 +75,20 @@ function makeVertexIndexBuffer(attrib)
             v32[vc + 3] = t[0];
             v32[vc + 4] = t[1];
 
-            i32[ic] = vc;
+            if (v[0] < vbounds[0])
+                vbounds[0] = v[0];
+            if (v[0] > vbounds[3])
+                vbounds[3] = v[0];
+            if (v[1] < vbounds[1])
+                vbounds[1] = v[1];
+            if (v[1] > vbounds[4])
+                vbounds[4] = v[1];
+            if (v[2] < vbounds[2])
+                vbounds[2] = v[2];
+            if (v[2] > vbounds[5])
+                vbounds[5] = v[2];
+
+            i32[ic] = vc / 5;
 
             vc += 5;
             ic += 1;
@@ -64,6 +96,11 @@ function makeVertexIndexBuffer(attrib)
             i32[ic] = f;
             ic += 1;
         }
+    }
+
+    if (ic > 0) {
+        const bi32 = toBuffer(i32);
+        i32s.push(bi32.slice(0, ic * Uint32Array.BYTES_PER_ELEMENT));
     }
 
     let mc = 0;
@@ -77,13 +114,13 @@ function makeVertexIndexBuffer(attrib)
     }
 
     const bv32 = toBuffer(v32);
-    const bi32 = toBuffer(i32);
     const bmchange = toBuffer(mchange);
 
     return {
+        i32s: i32s,
         v32: bv32.slice(0, vc * Float32Array.BYTES_PER_ELEMENT),
-        i32: bi32.slice(0, ic * Uint32Array.BYTES_PER_ELEMENT),
-        mchange: bmchange.slice(0, mc * Uint32Array.BYTES_PER_ELEMENT)
+        mchange: bmchange.slice(0, mc * Uint32Array.BYTES_PER_ELEMENT),
+        bounds: vbounds
     };
 }
 
@@ -107,10 +144,10 @@ function prepare(dir, file)
     };
 
     loader(file).then(data => {
-        return objloader(data, loader);
+        return objloader(data, loader, true /* triangulate */);
     }).then(obj => {
         //const v32 = makeFloat32Array(obj.attrib.vertices);
-        const vi = makeVertexIndexBuffer(obj.attrib);
+        const vi = makeVertexIndexBuffer(obj.attrib, obj.shapes);
 
         data.set(base, {
             vi: vi,
@@ -181,6 +218,9 @@ function serve()
             serveFile(path.join(__dirname, "gibbon.js"));
         } else if (p[0] === "all") {
             writeJson(JSON.stringify(Array.from(data.keys())));
+        } else if (p[0] === "gl-matrix-min.js") {
+            // special case for gl-matrix
+            serveFile(path.join(__dirname, "../node_modules/gl-matrix/gl-matrix-min.js"));
         } else {
             const ext = path.extname(p[0]);
             if (ext === ".js") {
@@ -209,13 +249,9 @@ function serve()
                         });
                     }
                     const out = {
-                        faces: d.obj.attrib.faces,
-                        numFaces: d.obj.attrib.numFaces,
-                        numFaceNumVerts: d.obj.attrib.numFaceNumVerts,
-                        faceNumVerts: d.obj.attrib.faceNumVerts,
-                        materialId: d.obj.attrib.materialId,
                         materials: mats,
-                        shapes: shapes
+                        shapes: shapes,
+                        bounds: d.vi.bounds
                     };
                     writeJson(JSON.stringify(out));
                 } else {
@@ -224,7 +260,17 @@ function serve()
                         writeBlob(d.vi.v32);
                         break;
                     case "indices":
-                        writeBlob(d.vi.i32);
+                        if (p.length === 2) {
+                            writeJson(JSON.stringify({ num: d.vi.i32s.length }));
+                        } else {
+                            const num = parseInt(p[2]);
+                            if (num < d.vi.i32s.length) {
+                                writeBlob(d.vi.i32s[num]);
+                            } else {
+                                res.writeHead(404);
+                                res.end();
+                            }
+                        }
                         break;
                     case "mchange":
                         writeBlob(d.vi.mchange);
