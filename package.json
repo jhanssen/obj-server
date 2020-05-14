@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "@jhanssen/options": "^1.0.28",
+    "date-fns": "^2.13.0",
     "gl-matrix": "^3.3.0",
     "glob": "^7.1.6",
     "mime-types": "^2.1.27",

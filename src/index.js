@@ -6,6 +6,7 @@ const fs = require("fs");
 const http = require("http");
 const mime = require("mime-types");
 const toBuffer = require("typedarray-to-buffer");
+const datefns = require("date-fns");
 
 const dir = options("dir", ".");
 const port = options.int("port", 8082);
@@ -14,6 +15,15 @@ const realDir = fs.realpathSync(dir);
 
 const data = new Map();
 let server;
+
+const date = {
+    log: function(...args) {
+        console.log.call(console, datefns.format(new Date(), "HH:mm:ss"), ...args);
+    },
+    error: function(...args) {
+        console.error.call(console, datefns.format(new Date(), "HH:mm:ss"), ...args);
+    }
+};
 
 function makeFloat32Array(arr)
 {
@@ -161,7 +171,7 @@ function prepare(dir, file)
 
 function serve()
 {
-    console.log(`listening on ${port}`);
+    date.log(`listening on ${port}`);
     const listener = (req, res) => {
         const writeJson = jsonstr => {
             res.writeHead(200, {
@@ -178,6 +188,7 @@ function serve()
             res.end(blobdata);
         };
         const serveFile = f => {
+            date.log("serving", f);
             fs.readFile(f, (err, data) => {
                 if (err || !data) {
                     res.writeHead(500);
