@@ -226,7 +226,7 @@ function serve()
 
         const p = req.url.split("/").filter(a => a.length > 0);
         if (p.length === 0 || p[0].length === 0) {
-            serveFile(path.join(__dirname, "gibbon.js"));
+            serveFile(path.join(realDir, "gibbon.js"));
         } else if (p[0] === "all") {
             writeJson(JSON.stringify(Array.from(data.keys())));
         } else if (p[0] === "gl-matrix-min.js") {
@@ -235,7 +235,7 @@ function serve()
         } else {
             const ext = path.extname(p[0]);
             if (ext === ".js") {
-                maybeServeFile(path.join(__dirname, p[0]), __dirname);
+                maybeServeFile(path.join(realDir, p[0]), realDir);
                 return;
             }
 
