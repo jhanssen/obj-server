@@ -275,7 +275,7 @@ function serve()
                             writeJson(JSON.stringify({ num: d.vi.i32s.length }));
                         } else {
                             const num = parseInt(p[2]);
-                            if (num < d.vi.i32s.length) {
+                            if (num >= 0 && num < d.vi.i32s.length) {
                                 writeBlob(d.vi.i32s[num]);
                             } else {
                                 res.writeHead(404);
