@@ -306,10 +306,6 @@ glob(path.join(dir, "*.obj"), (err, files) => {
         console.error(err);
         process.exit(1);
     }
-    if (files.length === 0) {
-        console.error(`no *.obj files in ${dir}`);
-        process.exit(1);
-    }
 
     for (const file of files) {
         prepare(dir, file);
